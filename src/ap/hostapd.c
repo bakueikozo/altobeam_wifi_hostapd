@@ -45,6 +45,7 @@
 #include "ndisc_snoop.h"
 #include "neighbor_db.h"
 #include "rrm.h"
+#include "drivers/driver_nl80211.h"
 
 
 static int hostapd_flush_old_stations(struct hostapd_data *hapd, u16 reason);
@@ -203,6 +204,73 @@ int hostapd_reload_config(struct hostapd_iface *iface)
 
 	return 0;
 }
+
+
+void hostapd_change_channel(struct hostapd_data *hapd,u16 channel,u16 second_channel)
+{
+	struct hostapd_iface *iface = hapd->iface;
+	size_t j;
+	struct i802_bss *bss_set = NULL;
+
+
+	/*
+	 * Deauthenticate all stations since the new configuration may not
+	 * allow them to use the BSS anymore.
+	 */
+	for (j = 0; j < iface->num_bss; j++) {
+		hostapd_flush_old_stations(iface->bss[j],
+					   WLAN_REASON_PREV_AUTH_NOT_VALID);
+		hostapd_broadcast_wep_clear(iface->bss[j]);
+
+#ifndef CONFIG_NO_RADIUS
+		/* TODO: update dynamic data based on changed configuration
+		 * items (e.g., open/close sockets, etc.) */
+		radius_client_flush(iface->bss[j]->radius, 0);
+#endif /* CONFIG_NO_RADIUS */
+	}
+
+	iface->conf->channel = channel;
+	iface->conf->secondary_channel  = second_channel;
+	if((channel <= 14) && (channel >=1))
+		iface->conf->hw_mode = HOSTAPD_MODE_IEEE80211G;
+	else if((channel==36)||(channel==38)||(channel==40)
+		||(channel==42)||(channel==44))
+		iface->conf->hw_mode = HOSTAPD_MODE_IEEE80211A;
+	
+	for (j = 0; j < iface->num_bss; j++) {
+		hapd = iface->bss[j];	
+		if (hapd->iconf->channel) {
+			iface->freq = hostapd_hw_get_freq(hapd, hapd->iconf->channel);
+			wpa_printf(MSG_DEBUG, "Mode: %s  Channel: %d  "
+				   "Frequency: %d MHz",
+				   hostapd_hw_mode_txt(hapd->iconf->hw_mode),
+				   hapd->iconf->channel, iface->freq);
+
+/*			if (hostapd_set_freq(hapd, hapd->iconf->hw_mode, iface->freq,
+					     hapd->iconf->channel,
+					     hapd->iconf->ieee80211n,
+					     hapd->iconf->secondary_channel)) */
+/*			if(hostapd_set_freq(hapd, hapd->iconf->hw_mode, iface->freq,
+				     hapd->iconf->channel,
+				     hapd->iconf->ieee80211n,
+				     hapd->iconf->ieee80211ac,
+				     hapd->iconf->secondary_channel,
+				     hapd->iconf->vht_oper_chwidth,
+				     hapd->iconf->vht_oper_centr_freq_seg0_idx,
+				     hapd->iconf->vht_oper_centr_freq_seg1_idx))
+						 {
+				wpa_printf(MSG_ERROR, "Could not set channel for "
+					   "kernel driver");
+				return ;
+			}*/
+		}
+		bss_set = (struct i802_bss *)hapd->drv_priv;
+		bss_set->beacon_set = 1;
+		hostapd_reload_bss(hapd);
+	}
+
+}
+
 
 
 static void hostapd_broadcast_key_clear_iface(struct hostapd_data *hapd,

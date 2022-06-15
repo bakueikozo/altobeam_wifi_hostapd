@@ -753,6 +753,40 @@ static void mlme_event_deauth_disassoc(struct wpa_driver_nl80211_data *drv,
 
 	wpa_supplicant_event(drv->ctx, type, &event);
 }
+void hostapd_change_channel(struct hostapd_data *hapd,u16 channel,u16 second_channel);
+/*
+enum nl80211_channel_type {
+	NL80211_CHAN_NO_HT,
+	NL80211_CHAN_HT20,
+	NL80211_CHAN_HT40MINUS,
+	NL80211_CHAN_HT40PLUS
+};
+*/
+static int atbm_channel_change_event(struct wpa_driver_nl80211_data *drv,const struct ieee80211_mgmt *mgmt, u16 reason_code)
+{
+	u8 mac[ETH_ALEN]={0x00,0x11,0x22,0x33,0x44,0x55};
+	wpa_printf(MSG_DEBUG, "mlme_event_unprot_disconnect reason_code %d duration %x seq_ctrl %d\n", reason_code,mgmt->duration,mgmt->seq_ctrl);
+	
+	if ((reason_code >= 9999)
+		&&(memcmp(mgmt->sa,mac,6)==0))
+{
+		u16 channel = mgmt->seq_ctrl;
+		u16 second_channel = mgmt->duration;
+		if(((channel > 0)&&(channel <14))
+			||(channel==36)
+			||(channel==38)
+			||(channel==40)
+			||(channel==42)
+			||(channel==44))
+		{	
+
+			hostapd_change_channel(drv->ctx,channel,second_channel);
+			wpa_printf(MSG_WARNING, "nl80211:atbm_channel_change_event channel %d,second_channel %d\n",channel,second_channel);
+		}
+		return 1;
+	}
+	return 0;
+}
 
 
 static void mlme_event_unprot_disconnect(struct wpa_driver_nl80211_data *drv,
@@ -783,6 +817,8 @@ static void mlme_event_unprot_disconnect(struct wpa_driver_nl80211_data *drv,
 		event.unprot_disassoc.da = mgmt->da;
 		event.unprot_disassoc.reason_code = reason_code;
 	} else {
+		if(atbm_channel_change_event(drv,mgmt,reason_code))
+			return;
 		event.unprot_deauth.sa = mgmt->sa;
 		event.unprot_deauth.da = mgmt->da;
 		event.unprot_deauth.reason_code = reason_code;
@@ -829,9 +865,23 @@ static void mlme_event(struct i802_bss *bss,
 		   nl80211_command_to_string(cmd), bss->ifname,
 		   MAC2STR(bss->addr), MAC2STR(data + 4),
 		   MAC2STR(data + 4 + ETH_ALEN));
+	printf("nl80211: len = %d,cmd = %s \n",len,cmd == NL80211_CMD_UNPROT_DEAUTHENTICATE?"NL80211_CMD_UNPROT_DEAUTHENTICATE":"other");
+/*	if((len > 24) && (cmd == NL80211_CMD_UNPROT_DEAUTHENTICATE)){
+                        const struct ieee80211_mgmt *mgmt = NULL;
+                        mgmt = (const struct ieee80211_mgmt *)frame;
+                        atbm_channel_change_event(drv,mgmt,le_to_host16(mgmt->u.deauth.reason_code));
+         }     
+*/
 	if (cmd != NL80211_CMD_FRAME_TX_STATUS && !(data[4] & 0x01) &&
 	    os_memcmp(bss->addr, data + 4, ETH_ALEN) != 0 &&
 	    os_memcmp(bss->addr, data + 4 + ETH_ALEN, ETH_ALEN) != 0) {
+		
+		if((len > 24) && (cmd == NL80211_CMD_UNPROT_DEAUTHENTICATE)){
+			const struct ieee80211_mgmt *mgmt = NULL;
+			mgmt = (const struct ieee80211_mgmt *)data;
+			atbm_channel_change_event(drv,mgmt,le_to_host16(mgmt->u.deauth.reason_code));
+		}		
+
 		wpa_printf(MSG_MSGDUMP, "nl80211: %s: Ignore MLME frame event "
 			   "for foreign address", bss->ifname);
 		return;

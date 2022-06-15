@@ -32,6 +32,7 @@
 
 struct hapd_global {
 	void **drv_priv;
+
 	size_t drv_count;
 };
 
@@ -626,7 +627,6 @@ static void hostapd_periodic(void *eloop_ctx, void *timeout_ctx)
 	hostapd_for_each_interface(interfaces, hostapd_periodic_call, NULL);
 }
 
-
 int main(int argc, char *argv[])
 {
 	struct hapd_interfaces interfaces;
@@ -644,10 +644,10 @@ int main(int argc, char *argv[])
 	int start_ifaces_in_sync = 0;
 	char **if_names = NULL;
 	size_t if_names_size = 0;
-
+	
 	if (os_program_init())
 		return -1;
-
+	
 	os_memset(&interfaces, 0, sizeof(interfaces));
 	interfaces.reload_config = hostapd_reload_config;
 	interfaces.config_read_cb = hostapd_config_read;
@@ -735,11 +735,10 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
-
 	if (optind == argc && interfaces.global_iface_path == NULL &&
 	    num_bss_configs == 0)
 		usage();
-
+	
 	wpa_msg_register_ifname_cb(hostapd_msg_ifname_cb);
 
 	if (log_file)
@@ -873,28 +872,34 @@ int main(int argc, char *argv[])
 		interfaces.iface[i]->driver_ap_teardown =
 			!!(interfaces.iface[i]->drv_flags &
 			   WPA_DRIVER_FLAGS_AP_TEARDOWN_SUPPORT);
+		//printf("\n%s %d %s\n",__func__,__LINE__,interfaces.iface[i]->config_fname);
 		hostapd_interface_deinit_free(interfaces.iface[i]);
+	//	printf("%s %d \n",__func__,__LINE__,interfaces.iface[i]->config_fname);
 	}
+//	printf("\n%s %d \n",__func__,__LINE__);
 	os_free(interfaces.iface);
 
 	if (interfaces.eloop_initialized)
 		eloop_cancel_timeout(hostapd_periodic, &interfaces, NULL);
+//	printf("\n%s %d \n",__func__,__LINE__);
 	hostapd_global_deinit(pid_file, interfaces.eloop_initialized);
+//	printf("\n%s %d \n",__func__,__LINE__);
 	os_free(pid_file);
 
 	if (log_file)
 		wpa_debug_close_file();
+//	printf("\n%s %d \n",__func__,__LINE__);
 	wpa_debug_close_linux_tracing();
-
+//	printf("\n%s %d \n",__func__,__LINE__);
 	os_free(bss_config);
 
 	for (i = 0; i < if_names_size; i++)
 		os_free(if_names[i]);
 	os_free(if_names);
-
+//	printf("\n%s %d \n",__func__,__LINE__);
 	fst_global_deinit();
-
+//	printf("\n%s %d \n",__func__,__LINE__);
 	os_program_deinit();
-
+//	printf("\n%s %d \n",__func__,__LINE__);
 	return ret;
 }

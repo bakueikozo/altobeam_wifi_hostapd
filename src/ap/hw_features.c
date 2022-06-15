@@ -291,6 +291,7 @@ static void ieee80211n_check_scan(struct hostapd_iface *iface)
 	struct wpa_scan_results *scan_res;
 	int oper40;
 	int res;
+	int fix40 = 1;
 
 	/* Check list of neighboring BSSes (from scan) to see whether 40 MHz is
 	 * allowed per IEEE Std 802.11-2012, 10.15.3.2 */
@@ -300,6 +301,10 @@ static void ieee80211n_check_scan(struct hostapd_iface *iface)
 	scan_res = hostapd_driver_get_scan_results(iface->bss[0]);
 	if (scan_res == NULL) {
 		hostapd_setup_interface_complete(iface, 1);
+		return;
+	}else if(fix40){
+		wpa_scan_results_free(scan_res);
+		hostapd_setup_interface_complete(iface, 0);
 		return;
 	}
 
@@ -911,8 +916,8 @@ int hostapd_select_hw_mode(struct hostapd_iface *iface)
 	     iface->conf->ieee80211n || iface->conf->ieee80211ac) &&
 	    iface->conf->channel == 14) {
 		wpa_printf(MSG_INFO, "Disable OFDM/HT/VHT on channel 14");
-		iface->conf->hw_mode = HOSTAPD_MODE_IEEE80211B;
-		iface->conf->ieee80211n = 0;
+		//iface->conf->hw_mode = HOSTAPD_MODE_IEEE80211B;
+		//iface->conf->ieee80211n = 0;
 		iface->conf->ieee80211ac = 0;
 	}
 

@@ -356,6 +356,7 @@ void hostapd_free_stas(struct hostapd_data *hapd)
 		sta = sta->next;
 		wpa_printf(MSG_DEBUG, "Removing station " MACSTR,
 			   MAC2STR(prev->addr));
+		hostapd_drv_sta_deauth(hapd, prev->addr, 3);
 		ap_free_sta(hapd, prev);
 	}
 }
